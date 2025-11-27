@@ -1,0 +1,5 @@
+{
+  "name": "CloudQuant Pro Dashboard",
+  "description": "A professional-grade financial analytics dashboard featuring real-time market data visualization, portfolio tracking, and trade execution. Includes a robust Hybrid Mode for seamless operation with or without API keys.",
+  "requestFramePermissions": []
+}
