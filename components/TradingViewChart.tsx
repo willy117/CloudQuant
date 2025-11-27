@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType, IChartApi } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, CandlestickSeries } from 'lightweight-charts';
 import { CandleData } from '../types';
 
 interface Props {
@@ -46,8 +46,8 @@ export const TradingViewChart: React.FC<Props> = ({ data, symbol, className }) =
 
     chartApiRef.current = chart;
 
-    // Fix: Cast chart to any to avoid TypeScript error about addCandlestickSeries not existing on IChartApi
-    const candlestickSeries = (chart as any).addCandlestickSeries({
+    // Lightweight Charts v5 Syntax: 使用 addSeries 並傳入 Series Class
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#10b981', // Tailwind green-500
       downColor: '#ef4444', // Tailwind red-500
       borderVisible: false,
