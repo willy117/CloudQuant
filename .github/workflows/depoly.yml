@@ -30,10 +30,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          # 關鍵修正：移除 cache: 'npm'，避免因缺少 package-lock.json 而報錯
 
       - name: Install dependencies
-        # 使用 npm install 而非 npm ci，因為此專案可能還沒有 lock file
+        # 使用 npm install 而非 npm ci，確保無 lock file 也能安裝
         run: npm install
 
       - name: Build
