@@ -2,39 +2,57 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: ["main"]
+
+  # 允許手動觸發
   workflow_dispatch:
 
+# 設定 GITHUB_TOKEN 的權限，這對 GitHub Pages 部署至關重要
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+# 避免同時間多次部署導致衝突
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  # 建置工作 (Build Job)
+  build:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout 🛎️
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ⚙️
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          # 暫時移除 cache: 'npm' 以避免 "lock file not found" 錯誤
+          cache: 'npm'
 
-      - name: Install Dependencies 🔧
-        # 使用 npm install 而非 npm ci，這樣即使沒有 package-lock.json 也能產生並安裝
+      - name: Install dependencies
+        # 使用 npm install 而非 npm ci，因為此專案可能還沒有 lock file
         run: npm install
 
-      - name: Build 🏗️
+      - name: Build
         run: npm run build
-        env:
-          # 在 Build 階段注入環境變數 (若有需要)
-          VITE_FINNHUB_API_KEY: ${{ secrets.VITE_FINNHUB_API_KEY }} 
-          VITE_FIREBASE_CONFIG_STRING: ${{ secrets.VITE_FIREBASE_CONFIG_STRING }}
 
-      - name: Deploy 🚀
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Upload artifact
+        # 使用官方 Action 上傳 dist 資料夾
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: dist
-          branch: gh-pages
+          path: ./dist
+
+  # 部署工作 (Deploy Job)
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
