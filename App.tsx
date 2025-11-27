@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TradingViewChart } from './components/TradingViewChart';
 import { AssetAllocation } from './components/AssetAllocation';
 import { TradePanel } from './components/TradePanel';
-import { fetchStockCandles } from './services/marketService';
+import { fetchStockCandles, fetchStockQuote } from './services/marketService';
 import { getTradeHistory } from './services/firebaseService';
 import { CandleData, Trade } from './types';
 import { IS_MOCK_MODE, IS_DB_MOCK } from './constants';
@@ -21,6 +21,41 @@ const App: React.FC = () => {
     loadMarketData();
     loadPortfolioData();
   }, [activeSymbol]);
+
+  // 即時行情輪詢 (每 5 秒更新一次)
+  useEffect(() => {
+    const intervalId = setInterval(async () => {
+      if (!activeSymbol || candles.length === 0) return;
+
+      try {
+        const quote = await fetchStockQuote(activeSymbol);
+        
+        setCandles(prevCandles => {
+          if (prevCandles.length === 0) return prevCandles;
+          
+          const newCandles = [...prevCandles];
+          const lastCandle = newCandles[newCandles.length - 1];
+          
+          // 更新最後一根 K 線
+          // 注意：真實環境下需檢查 timestamp 是否跨日/跨分鐘，這裡簡化為直接更新當日數據
+          const updatedCandle = {
+            ...lastCandle,
+            close: quote.c,
+            high: Math.max(lastCandle.high, quote.c),
+            low: Math.min(lastCandle.low, quote.c),
+            // 若有成交量資訊可在此累加
+          };
+
+          newCandles[newCandles.length - 1] = updatedCandle;
+          return newCandles;
+        });
+      } catch (error) {
+        console.error("Polling error:", error);
+      }
+    }, 5000); // 5 seconds polling
+
+    return () => clearInterval(intervalId);
+  }, [activeSymbol, candles.length > 0]); // 依賴 activeSymbol 和是否已有初始資料
 
   const loadMarketData = async () => {
     const data = await fetchStockCandles(activeSymbol);

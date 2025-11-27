@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType, IChartApi, CandlestickSeries } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickSeries, Time } from 'lightweight-charts';
 import { CandleData } from '../types';
 
 interface Props {
@@ -11,19 +11,11 @@ interface Props {
 export const TradingViewChart: React.FC<Props> = ({ data, symbol, className }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartApiRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
+  // 1. 初始化圖表 (只執行一次)
   useEffect(() => {
     if (!chartContainerRef.current) return;
-
-    // 清除舊的 Chart (如果有的話)
-    if (chartApiRef.current) {
-      chartApiRef.current.remove();
-      chartApiRef.current = null;
-    }
-
-    const handleResize = () => {
-      chartApiRef.current?.applyOptions({ width: chartContainerRef.current!.clientWidth });
-    };
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
@@ -31,7 +23,7 @@ export const TradingViewChart: React.FC<Props> = ({ data, symbol, className }) =
         textColor: '#333',
       },
       width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight, // Use container height
+      height: chartContainerRef.current.clientHeight,
       grid: {
         vertLines: { color: '#f0f0f0' },
         horzLines: { color: '#f0f0f0' },
@@ -41,36 +33,61 @@ export const TradingViewChart: React.FC<Props> = ({ data, symbol, className }) =
       },
       timeScale: {
         borderColor: '#d1d4dc',
+        timeVisible: true,
       },
     });
 
-    chartApiRef.current = chart;
-
-    // Lightweight Charts v5 Syntax: 使用 addSeries 並傳入 Series Class
-    const candlestickSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#10b981', // Tailwind green-500
-      downColor: '#ef4444', // Tailwind red-500
+    // 建立 Series
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: '#10b981',
+      downColor: '#ef4444',
       borderVisible: false,
       wickUpColor: '#10b981',
       wickDownColor: '#ef4444',
     });
 
-    // 轉換資料格式 (TradingView 嚴格要求時間排序與格式)
-    // @ts-ignore lightweight-charts types can be picky
-    candlestickSeries.setData(data);
+    chartApiRef.current = chart;
+    seriesRef.current = series;
 
-    chart.timeScale().fitContent();
+    const handleResize = () => {
+      if (chartContainerRef.current && chartApiRef.current) {
+        chartApiRef.current.applyOptions({ 
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight
+        });
+      }
+    };
 
     window.addEventListener('resize', handleResize);
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (chartApiRef.current) {
-        chartApiRef.current.remove();
-        chartApiRef.current = null;
-      }
+      chart.remove();
+      chartApiRef.current = null;
+      seriesRef.current = null;
     };
-  }, [data, symbol]);
+  }, []);
+
+  // 2. 數據更新監聽 (不會銷毀圖表)
+  useEffect(() => {
+    if (seriesRef.current && data.length > 0) {
+      const chartData = data.map(item => ({
+        time: item.time as Time,
+        open: item.open,
+        high: item.high,
+        low: item.low,
+        close: item.close,
+      }));
+      seriesRef.current.setData(chartData);
+    }
+  }, [data]);
+
+  // 3. 股票代號變更時重置視圖
+  useEffect(() => {
+    if (chartApiRef.current && data.length > 0) {
+      chartApiRef.current.timeScale().fitContent();
+    }
+  }, [symbol]);
 
   return (
     <div className={`bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col ${className}`}>
