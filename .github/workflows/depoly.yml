@@ -3,49 +3,48 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: ["main"]
-
-  # 允許手動觸發
   workflow_dispatch:
 
-# 設定 GITHUB_TOKEN 的權限，這對 GitHub Pages 部署至關重要
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# 避免同時間多次部署導致衝突
 concurrency:
   group: "pages"
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  # 建置工作 (Build Job)
+  # Build job
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          # 關鍵修正：移除 cache: 'npm'，避免因缺少 package-lock.json 而報錯
-
+          node-version: "20"
+          # 移除 cache 設定以避免無 lock file 報錯
+      
       - name: Install dependencies
-        # 使用 npm install 而非 npm ci，確保無 lock file 也能安裝
         run: npm install
 
       - name: Build
         run: npm run build
+        env:
+          # 關鍵修改：將 GitHub Secrets 注入到編譯環境中
+          # Vite 會在打包時讀取這些變數並「寫死」進 JavaScript 檔案裡
+          VITE_FINNHUB_API_KEY: ${{ secrets.VITE_FINNHUB_API_KEY }}
+          VITE_FIREBASE_CONFIG_STRING: ${{ secrets.VITE_FIREBASE_CONFIG_STRING }}
 
       - name: Upload artifact
-        # 使用官方 Action 上傳 dist 資料夾
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
-  # 部署工作 (Deploy Job)
+  # Deployment job
   deploy:
     environment:
       name: github-pages
